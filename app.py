@@ -1,8 +1,8 @@
+from PIL import Image
 import streamlit as st
 from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 import numpy as np
-import cv2
 from collections import Counter
 from skimage.color import rgb2lab, deltaE_cie76
 
@@ -10,28 +10,36 @@ from skimage.color import rgb2lab, deltaE_cie76
 # Function definitions
 
 def RGB2HEX(color):
-  return "#{:02x}{:02x}{:02x}".format(int(color[0]), int(color[1]), int(color[2]))
+    return "#{:02x}{:02x}{:02x}".format(int(color[0]), int(color[1]), int(color[2]))
+
 
 def get_image(image_data):
-  image = cv2.imdecode(np.frombuffer(image_data, np.uint8), cv2.IMREAD_COLOR)
-  image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-  return image
+    image = Image.open(image_data)
+    image = image.convert('RGB')  # Ensure RGB mode
+    return np.array(image)  # Convert to NumPy array for processing
+
 
 def get_colors(image, number_of_colors):
-  modified_image = cv2.resize(image, (600, 400), interpolation=cv2.INTER_AREA)
-  modified_image = modified_image.reshape(modified_image.shape[0] * modified_image.shape[1], 3)
+    # Resize the image (optional)
+    # resized_image = image.resize((600, 400), Image.ANTIALIAS)
+    # image = np.array(resized_image)
 
-  clf = KMeans(n_clusters=number_of_colors, random_state=42)
-  labels = clf.fit_predict(modified_image)
+    # Flatten the image (similar to OpenCV reshape)
+    modified_image = image.flatten().reshape(image.shape[0] * image.shape[1], 3)
 
-  counts = Counter(labels)
-  counts = dict(sorted(counts.items()))
+    # KMeans clustering
+    clf = KMeans(n_clusters=number_of_colors, random_state=42)
+    labels = clf.fit_predict(modified_image)
 
-  center_colors = clf.cluster_centers_
-  ordered_colors = [center_colors[i] for i in counts.keys()]
-  hex_colors = [RGB2HEX(ordered_colors[i]) for i in counts.keys()]
+    counts = Counter(labels)
+    counts = dict(sorted(counts.items()))
 
-  return list(zip(hex_colors, counts.values()))
+    center_colors = clf.cluster_centers_
+    ordered_colors = [center_colors[i] for i in counts.keys()]
+    hex_colors = [RGB2HEX(color) for color in ordered_colors]
+
+    return list(zip(hex_colors, counts.values()))
+
 
 # Streamlit UI
 
@@ -40,13 +48,13 @@ st.title('Colour Analysis for better ranking')
 uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
 if uploaded_file is not None:
-  # Read image from file uploader
-  image = get_image(uploaded_file.read())
+    # Read image from file uploader
+    image = get_image(uploaded_file)
 
-  # Display image using st.image()
-  st.image(image, caption='Uploaded Image', use_column_width=True)
+    # Display image using st.image()
+    st.image(image, caption='Uploaded Image', use_column_width=True)
 
-  number_of_colors = st.slider('Select number of colors', min_value=1, max_value=20, value=5)
+    number_of_colors = st.slider('Select number of colors', min_value=1, max_value=20, value=5)
 
 
 if st.button('Identify Colors'):
